@@ -248,22 +248,63 @@
     if (fn) fn();
   });
 
-  /* ---------- copy email to clipboard (styles for #nm-copy-toast live in the page CSS) ---------- */
+  /* ---------- copy email to clipboard (styles for #nm-copy-toast live in the page CSS) ----------
+     Every email link keeps its mailto: href, so anyone with a mail client gets it.
+     For anyone without one, clicking also copies the address to the clipboard and
+     shows a toast, so the email is never a dead end. */
 
+  var checkIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:1.15rem;height:1.15rem;flex:none"><path d="M20 6 9 17l-5-5"></path></svg>';
   var toast = document.createElement('div');
   toast.id = 'nm-copy-toast';
   toast.setAttribute('role', 'status');
-  toast.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:1.15rem;height:1.15rem"><path d="M20 6 9 17l-5-5"></path></svg>Email copied to clipboard';
+  toast.setAttribute('aria-live', 'polite');
   document.body.appendChild(toast);
   var toastTimer;
 
+  function showToast(msg) {
+    toast.innerHTML = checkIcon + '<span>' + msg + '</span>';
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2600);
+  }
+
+  // Fallback for insecure contexts (file://, plain http) where navigator.clipboard is undefined.
+  function legacyCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function copyEmail(email) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(email).then(function () {
+        showToast('Copied ' + email);
+      }).catch(function () {
+        showToast(legacyCopy(email) ? 'Copied ' + email : email + ' — copy it manually');
+      });
+    } else {
+      showToast(legacyCopy(email) ? 'Copied ' + email : email + ' — copy it manually');
+    }
+  }
+
   document.addEventListener('click', function (e) {
     var el = e.target.closest('[data-copy-email]');
-    if (!el || !navigator.clipboard) return; // without clipboard API the mailto: href still works
-    navigator.clipboard.writeText(el.getAttribute('data-copy-email')).then(function () {
-      toast.classList.add('show');
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2200);
-    }).catch(function () { /* clipboard blocked: the mailto: link has already opened */ });
+    if (!el) return;
+    copyEmail(el.getAttribute('data-copy-email'));
+  });
+
+  // Keyboard access: these anchors have real hrefs, but also fire copy on Enter/Space.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var el = e.target.closest && e.target.closest('[data-copy-email]');
+    if (!el) return;
+    copyEmail(el.getAttribute('data-copy-email'));
   });
 })();
