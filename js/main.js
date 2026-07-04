@@ -247,4 +247,23 @@
     var fn = actions[el.getAttribute('data-action')];
     if (fn) fn();
   });
+
+  /* ---------- copy email to clipboard (styles for #nm-copy-toast live in the page CSS) ---------- */
+
+  var toast = document.createElement('div');
+  toast.id = 'nm-copy-toast';
+  toast.setAttribute('role', 'status');
+  toast.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="width:1.15rem;height:1.15rem"><path d="M20 6 9 17l-5-5"></path></svg>Email copied to clipboard';
+  document.body.appendChild(toast);
+  var toastTimer;
+
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-copy-email]');
+    if (!el || !navigator.clipboard) return; // without clipboard API the mailto: href still works
+    navigator.clipboard.writeText(el.getAttribute('data-copy-email')).then(function () {
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { toast.classList.remove('show'); }, 2200);
+    }).catch(function () { /* clipboard blocked: the mailto: link has already opened */ });
+  });
 })();
